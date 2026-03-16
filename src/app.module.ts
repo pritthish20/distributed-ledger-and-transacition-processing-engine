@@ -18,4 +18,4 @@ import { ReconciliationModule } from './modules/reconciliation/reconciliation.mo
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
