@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
-import { JobsService } from './jobs.service';
 import { BullModule } from '@nestjs/bullmq';
+import { JobsService } from './jobs.service';
 import { ConfigService } from '@nestjs/config';
+import { OutboxModule } from '../modules/outbox/outbox.module';
+import { ReconciliationModule } from '../modules/reconciliation/reconciliation.module';
+import { WebhooksModule } from '../modules/webhooks/webhooks.module';
+import { WebhookDeliveryProcessor } from './processors/webhook-delivery.processor';
 
 @Module({
   imports:[
@@ -15,7 +19,10 @@ import { ConfigService } from '@nestjs/config';
         },
       }),
     }),
+    OutboxModule,
+    WebhooksModule,
+    ReconciliationModule,
   ],
-  providers: [JobsService]
+  providers: [JobsService, WebhookDeliveryProcessor],
 })
 export class JobsModule {}

@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { LedgerEntryEntity } from './entities/ledger-entry.entity';
 import { LedgerService } from './ledger.service';
 
 @Module({
-  providers: [LedgerService]
+  imports: [TypeOrmModule.forFeature([LedgerEntryEntity])],
+  providers: [LedgerService],
+  exports: [LedgerService],
 })
 export class LedgerModule {}
