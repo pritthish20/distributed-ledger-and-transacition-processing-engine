@@ -66,7 +66,14 @@ describe('ReconciliationService', () => {
         },
       ]);
 
-    await service.runReconciliation();
+    const result = await service.runReconciliation();
+
+    expect(result).toMatchObject({
+      skipped: false,
+      runId: 'run-1',
+      status: ReconciliationRunStatus.COMPLETED,
+      totalIssues: 2,
+    });
 
     expect(issuesRepository.save).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -96,7 +103,14 @@ describe('ReconciliationService', () => {
       .mockImplementation(() => undefined);
     dataSource.query.mockRejectedValueOnce(new Error('database failed'));
 
-    await service.runReconciliation();
+    const result = await service.runReconciliation();
+
+    expect(result).toMatchObject({
+      skipped: false,
+      runId: 'run-1',
+      status: ReconciliationRunStatus.FAILED,
+      totalIssues: 0,
+    });
 
     expect(runsRepository.update).toHaveBeenCalledWith(
       'run-1',
@@ -107,5 +121,15 @@ describe('ReconciliationService', () => {
       }),
     );
     loggerSpy.mockRestore();
+  });
+
+  it('skips overlapping reconciliation runs', async () => {
+    service['running'] = true;
+
+    await expect(service.runReconciliation()).resolves.toEqual({
+      skipped: true,
+      reason: 'already_running',
+    });
+    expect(runsRepository.save).not.toHaveBeenCalled();
   });
 });

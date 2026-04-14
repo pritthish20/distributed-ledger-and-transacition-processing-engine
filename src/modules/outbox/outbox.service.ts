@@ -40,6 +40,12 @@ export class OutboxService {
   }
 
   async getPendingEvents(limit = 20) {
+    const staleBefore = new Date(Date.now() - 30000);
+
+    return this.getProcessableEvents(limit, staleBefore);
+  }
+
+  async getProcessableEvents(limit = 20, staleBefore = new Date(Date.now() - 30000)) {
     return this.outboxRepository.find({
       where: [
         {
@@ -49,6 +55,10 @@ export class OutboxService {
         {
           status: OutboxStatus.PENDING,
           nextRetryAt: LessThanOrEqual(new Date()),
+        },
+        {
+          status: OutboxStatus.PROCESSING,
+          updatedAt: LessThanOrEqual(staleBefore),
         },
       ],
       order: {

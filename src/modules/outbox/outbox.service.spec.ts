@@ -78,13 +78,22 @@ describe('OutboxService', () => {
     );
   });
 
-  it('fetches pending events in creation order', async () => {
+  it('fetches pending and stale processing events in creation order', async () => {
     repository.find.mockResolvedValue([{ id: 'event-1' }]);
+    const staleBefore = new Date('2026-01-01T00:00:00.000Z');
 
-    await expect(service.getPendingEvents(10)).resolves.toEqual([{ id: 'event-1' }]);
+    await expect(service.getProcessableEvents(10, staleBefore)).resolves.toEqual([{ id: 'event-1' }]);
 
     expect(repository.find).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: expect.arrayContaining([
+          expect.objectContaining({
+            status: OutboxStatus.PENDING,
+          }),
+          expect.objectContaining({
+            status: OutboxStatus.PROCESSING,
+          }),
+        ]),
         order: { createdAt: 'ASC' },
         take: 10,
       }),

@@ -44,6 +44,7 @@ describe('WebhooksService', () => {
     jest.clearAllMocks();
     subscriptionsRepository.create.mockImplementation((value) => value);
     deliveriesRepository.create.mockImplementation((value) => value);
+    deliveriesRepository.find.mockResolvedValue([]);
     configService.get.mockImplementation((key: string) => {
       if (key === 'queue.webhookMaxAttempts') return 3;
       if (key === 'queue.webhookBackoffMs') return 1000;
@@ -139,6 +140,10 @@ describe('WebhooksService', () => {
     deliveriesRepository.save.mockResolvedValue([
       {
         id: 'delivery-1',
+        webhookSubscriptionId: 'subscription-1',
+        outboxEventId: 'event-1',
+        status: WebhookDeliveryStatus.PENDING,
+        attemptCount: 0,
       },
     ]);
 
@@ -158,6 +163,62 @@ describe('WebhooksService', () => {
         jobId: 'delivery-1-attempt-1',
       }),
     );
+  });
+
+  it('reuses existing pending deliveries when dispatch is retried', async () => {
+    outboxRepository.findOne.mockResolvedValue({
+      id: 'event-1',
+      eventType: 'transaction.completed',
+    });
+    subscriptionsRepository.find.mockResolvedValue([
+      {
+        id: 'subscription-1',
+        eventType: 'transaction.completed',
+      },
+    ]);
+    deliveriesRepository.find.mockResolvedValue([
+      {
+        id: 'delivery-1',
+        webhookSubscriptionId: 'subscription-1',
+        outboxEventId: 'event-1',
+        status: WebhookDeliveryStatus.PENDING,
+        attemptCount: 1,
+      },
+    ]);
+
+    await service.dispatchOutboxEvent('event-1');
+
+    expect(deliveriesRepository.save).not.toHaveBeenCalled();
+    expect(webhookQueue.add).toHaveBeenCalledWith(
+      'deliver-webhook',
+      { deliveryId: 'delivery-1' },
+      expect.objectContaining({
+        jobId: 'delivery-1-attempt-2',
+      }),
+    );
+  });
+
+  it('skips terminal deliveries when duplicate queue jobs are processed', async () => {
+    global.fetch = jest.fn() as jest.Mock;
+    deliveriesRepository.findOne.mockResolvedValue({
+      id: 'delivery-1',
+      outboxEventId: 'event-1',
+      status: WebhookDeliveryStatus.SUCCESS,
+      attemptCount: 1,
+      subscription: {
+        targetUrl: 'https://merchant.example/webhook',
+        secret: 'super-secret',
+      },
+      outboxEvent: {
+        eventType: 'transaction.completed',
+        payload: { transactionId: 'txn-1' },
+      },
+    });
+
+    await service.processDelivery('delivery-1');
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(deliveriesRepository.update).not.toHaveBeenCalled();
   });
 
   it('marks successful webhook delivery and publishes completed outbox event', async () => {

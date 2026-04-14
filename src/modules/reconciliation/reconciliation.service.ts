@@ -24,7 +24,10 @@ export class ReconciliationService {
 
   async runReconciliation() {
     if (this.running) {
-      return;
+      return {
+        skipped: true,
+        reason: 'already_running',
+      };
     }
 
     this.running = true;
@@ -71,6 +74,13 @@ export class ReconciliationService {
         totalIssues: issues.length,
         completedAt: new Date(),
       });
+
+      return {
+        skipped: false,
+        runId: run.id,
+        status: ReconciliationRunStatus.COMPLETED,
+        totalIssues: issues.length,
+      };
     } catch (error) {
       this.logger.error('Reconciliation run failed', error instanceof Error ? error.stack : undefined);
       await this.runsRepository.update(run.id, {
@@ -78,6 +88,13 @@ export class ReconciliationService {
         errorMessage: error instanceof Error ? error.message : 'Reconciliation failed',
         completedAt: new Date(),
       });
+
+      return {
+        skipped: false,
+        runId: run.id,
+        status: ReconciliationRunStatus.FAILED,
+        totalIssues: 0,
+      };
     } finally {
       this.running = false;
     }

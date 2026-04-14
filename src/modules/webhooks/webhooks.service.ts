@@ -64,26 +64,48 @@ export class WebhooksService {
         status: WebhookSubscriptionStatus.ACTIVE,
       },
     });
+    const existingDeliveries = await this.deliveriesRepository.find({
+      where: { outboxEventId: event.id },
+    });
 
-    if (subscriptions.length === 0) {
+    if (subscriptions.length === 0 && existingDeliveries.length === 0) {
       await this.outboxService.markPublished(event.id);
       return;
     }
 
-    const deliveries = await this.deliveriesRepository.save(
-      subscriptions.map((subscription) =>
-        this.deliveriesRepository.create({
-          webhookSubscriptionId: subscription.id,
-          outboxEventId: event.id,
-          status: WebhookDeliveryStatus.PENDING,
-          attemptCount: 0,
-          nextRetryAt: new Date(),
-        }),
-      ),
+    const existingSubscriptionIds = new Set(
+      existingDeliveries.map((delivery) => delivery.webhookSubscriptionId),
+    );
+    const missingSubscriptions = subscriptions.filter(
+      (subscription) => !existingSubscriptionIds.has(subscription.id),
+    );
+    const newDeliveries =
+      missingSubscriptions.length > 0
+        ? await this.deliveriesRepository.save(
+            missingSubscriptions.map((subscription) =>
+              this.deliveriesRepository.create({
+                webhookSubscriptionId: subscription.id,
+                outboxEventId: event.id,
+                status: WebhookDeliveryStatus.PENDING,
+                attemptCount: 0,
+                nextRetryAt: new Date(),
+              }),
+            ),
+          )
+        : [];
+    const pendingDeliveries = [...existingDeliveries, ...newDeliveries].filter(
+      (delivery) => delivery.status === WebhookDeliveryStatus.PENDING,
     );
 
+    if (pendingDeliveries.length === 0) {
+      await this.updateOutboxStatus(event.id);
+      return;
+    }
+
     await Promise.all(
-      deliveries.map((delivery) => this.enqueueDelivery(delivery.id, 0, 1)),
+      pendingDeliveries.map((delivery) =>
+        this.enqueueDelivery(delivery.id, 0, delivery.attemptCount + 1),
+      ),
     );
   }
 
@@ -97,6 +119,13 @@ export class WebhooksService {
     });
 
     if (!delivery) {
+      return;
+    }
+
+    if (
+      delivery.status === WebhookDeliveryStatus.SUCCESS ||
+      delivery.status === WebhookDeliveryStatus.FAILED
+    ) {
       return;
     }
 

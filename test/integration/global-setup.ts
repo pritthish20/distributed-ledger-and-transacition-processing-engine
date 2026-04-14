@@ -19,6 +19,12 @@ export default async function globalSetup() {
   process.env.QUEUE_PREFIX = process.env.QUEUE_PREFIX ?? 'ledger-engine-test';
   process.env.WEBHOOK_MAX_ATTEMPTS = process.env.WEBHOOK_MAX_ATTEMPTS ?? '3';
   process.env.WEBHOOK_BACKOFF_MS = process.env.WEBHOOK_BACKOFF_MS ?? '100';
+  process.env.OUTBOX_POLL_INTERVAL_MS = process.env.OUTBOX_POLL_INTERVAL_MS ?? '500';
+  process.env.OUTBOX_BATCH_SIZE = process.env.OUTBOX_BATCH_SIZE ?? '20';
+  process.env.OUTBOX_BACKOFF_MS = process.env.OUTBOX_BACKOFF_MS ?? '100';
+  process.env.OUTBOX_MAX_ATTEMPTS = process.env.OUTBOX_MAX_ATTEMPTS ?? '3';
+  process.env.OUTBOX_STALE_AFTER_MS = process.env.OUTBOX_STALE_AFTER_MS ?? '500';
+  process.env.RECONCILIATION_INTERVAL_MS = process.env.RECONCILIATION_INTERVAL_MS ?? '5000';
 
   try {
     await ensureTestDatabase();

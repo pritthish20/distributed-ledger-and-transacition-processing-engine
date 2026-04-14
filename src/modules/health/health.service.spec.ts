@@ -85,5 +85,5 @@ describe('HealthService', () => {
 });
 
 function getRedisMock() {
-  return (Redis as jest.Mock).mock.results.at(-1)?.value;
+  return (Redis as unknown as jest.Mock).mock.results.at(-1)?.value;
 }

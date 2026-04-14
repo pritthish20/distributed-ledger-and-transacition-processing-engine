@@ -109,6 +109,14 @@ Owns background workers for:
 - webhook retries
 - reconciliation scheduling
 
+Phase 2 reliability expectations:
+
+- outbox polling is configurable
+- stale `processing` outbox rows are recovered
+- dispatch failures are retried per event without blocking the full batch
+- webhook delivery creation is idempotent per subscription/outbox event
+- duplicate queue jobs must not redeliver terminal webhook deliveries
+
 ### `reconciliation`
 
 Runs background consistency checks between balances and ledger-derived totals and flags anomalies.
@@ -373,3 +381,4 @@ The success criterion is a working transaction engine that can clearly demonstra
 - duplicate request protection
 - reliable post-commit event handling
 - audit and reconciliation readiness
+

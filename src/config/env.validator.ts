@@ -45,6 +45,36 @@ class EnvVars {
     @Min(1)
     WEBHOOK_MAX_ATTEMPTS:number=5;
 
+    @Type(()=>Number)
+    @IsInt()
+    @Min(100)
+    OUTBOX_POLL_INTERVAL_MS:number=5000;
+
+    @Type(()=>Number)
+    @IsInt()
+    @Min(1)
+    OUTBOX_BATCH_SIZE:number=20;
+
+    @Type(()=>Number)
+    @IsInt()
+    @Min(100)
+    OUTBOX_BACKOFF_MS:number=5000;
+
+    @Type(()=>Number)
+    @IsInt()
+    @Min(1)
+    OUTBOX_MAX_ATTEMPTS:number=5;
+
+    @Type(()=>Number)
+    @IsInt()
+    @Min(100)
+    OUTBOX_STALE_AFTER_MS:number=30000;
+
+    @Type(()=>Number)
+    @IsInt()
+    @Min(1000)
+    RECONCILIATION_INTERVAL_MS:number=60000;
+
 }
 
 export function validate(config: Record<string,unknown>){

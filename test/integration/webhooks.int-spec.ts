@@ -3,16 +3,19 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
+import { WebhooksService } from '../../src/modules/webhooks/webhooks.service';
 import { createIntegrationApp, truncateDomainTables, waitForCondition } from './test-app';
 
 describe('Webhook worker integration', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let webhooksService: WebhooksService;
   let receiver: TestWebhookReceiver;
 
   beforeAll(async () => {
     app = await createIntegrationApp();
     dataSource = app.get(DataSource);
+    webhooksService = app.get(WebhooksService);
     receiver = await createWebhookReceiver();
   });
 
@@ -133,6 +136,45 @@ describe('Webhook worker integration', () => {
     const [outboxEvent] = await dataSource.query('SELECT status FROM outbox_events LIMIT 1');
     expect(outboxEvent.status).toBe('failed');
   });
+
+  it('recovers a stale processing outbox event and delivers it', async () => {
+    await registerWebhook(app, `${receiver.url}/webhook`, 'webhook-stale-subscription-1');
+    const account = await createAccount(app, 'webhook-stale-account-1');
+    const { transactionId, outboxEventId } = await createProcessingOutboxEvent(
+      dataSource,
+      account.id,
+      1700,
+    );
+
+    await waitForCondition(async () => receiver.requests.length === 1, 20000);
+
+    expect(receiver.requests[0].body).toMatchObject({
+      transactionId,
+      amount: 1700,
+      toAccountId: account.id,
+    });
+
+    const [outboxEvent] = await dataSource.query(
+      'SELECT status FROM outbox_events WHERE id = $1',
+      [outboxEventId],
+    );
+    expect(outboxEvent.status).toBe('published');
+  });
+
+  it('does not create duplicate delivery rows when the same outbox event is dispatched twice', async () => {
+    await registerWebhook(app, `${receiver.url}/webhook`, 'webhook-dedupe-subscription-1');
+    const account = await createAccount(app, 'webhook-dedupe-account-1');
+    const { outboxEventId } = await createProcessingOutboxEvent(dataSource, account.id, 1900, false);
+
+    await webhooksService.dispatchOutboxEvent(outboxEventId);
+    await webhooksService.dispatchOutboxEvent(outboxEventId);
+
+    const [counts] = await dataSource.query(
+      'SELECT COUNT(*) AS deliveries FROM webhook_deliveries WHERE outbox_event_id = $1',
+      [outboxEventId],
+    );
+    expect(Number(counts.deliveries)).toBe(1);
+  });
 });
 
 async function registerWebhook(
@@ -159,6 +201,64 @@ async function createAccount(app: INestApplication<App>, idempotencyKey: string)
     .expect(201);
 
   return response.body as { id: string };
+}
+
+async function createProcessingOutboxEvent(
+  dataSource: DataSource,
+  accountId: string,
+  amount: number,
+  stale = true,
+) {
+  const [transaction] = await dataSource.query(
+    `
+      INSERT INTO transactions (type, status, amount, currency, to_account_id, completed_at)
+      VALUES ('deposit', 'completed', $1, 'INR', $2, now())
+      RETURNING id
+    `,
+    [amount, accountId],
+  );
+  const [outboxEvent] = await dataSource.query(
+    `
+      INSERT INTO outbox_events (
+        aggregate_type,
+        aggregate_id,
+        event_type,
+        payload,
+        status,
+        transaction_id,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        'transaction',
+        $1,
+        'transaction.completed',
+        $2::jsonb,
+        'processing',
+        $1,
+        now() - interval '2 seconds',
+        ${stale ? "now() - interval '2 seconds'" : 'now()'}
+      )
+      RETURNING id
+    `,
+    [
+      transaction.id,
+      JSON.stringify({
+        transactionId: transaction.id,
+        type: 'deposit',
+        amount,
+        currency: 'INR',
+        fromAccountId: null,
+        toAccountId: accountId,
+        completedAt: new Date().toISOString(),
+      }),
+    ],
+  );
+
+  return {
+    transactionId: transaction.id as string,
+    outboxEventId: outboxEvent.id as string,
+  };
 }
 
 async function createWebhookReceiver() {
