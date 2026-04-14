@@ -235,7 +235,7 @@ async function createProcessingOutboxEvent(
         'transaction.completed',
         $2::jsonb,
         'processing',
-        $1,
+        $3,
         now() - interval '2 seconds',
         ${stale ? "now() - interval '2 seconds'" : 'now()'}
       )
@@ -252,6 +252,7 @@ async function createProcessingOutboxEvent(
         toAccountId: accountId,
         completedAt: new Date().toISOString(),
       }),
+      transaction.id,
     ],
   );
 
