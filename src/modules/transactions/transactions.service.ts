@@ -157,6 +157,9 @@ export class TransactionsService {
         where: {
           id: In(orderedIds),
         },
+        order: {
+          id: 'ASC',
+        },
         lock: { mode: 'pessimistic_write' },
       });
 

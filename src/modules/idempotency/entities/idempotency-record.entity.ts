@@ -32,10 +32,10 @@ export class IdempotencyRecordEntity {
   })
   status!: IdempotencyStatus;
 
-  @Column({ name: 'transaction_id', nullable: true })
+  @Column({ name: 'transaction_id', type: 'uuid', nullable: true })
   transactionId!: string | null;
 
-  @Column({ name: 'response_code', nullable: true })
+  @Column({ name: 'response_code', type: 'int', nullable: true })
   responseCode!: number | null;
 
   @Column({ name: 'response_body', type: 'jsonb', nullable: true })

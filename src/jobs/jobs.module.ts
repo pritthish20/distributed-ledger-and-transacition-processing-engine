@@ -12,6 +12,7 @@ import { WebhookDeliveryProcessor } from './processors/webhook-delivery.processo
     BullModule.forRootAsync({
       inject:[ConfigService],
       useFactory:(configService:ConfigService)=>({
+        prefix: configService.get<string>('queue.prefix'),
         connection:{
           host:configService.get<string>('redis.host'),
           port: configService.get<number>('redis.port'),

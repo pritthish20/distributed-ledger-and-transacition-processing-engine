@@ -102,3 +102,18 @@ docker compose logs redis
 npm run test
 npm run test:e2e
 ```
+
+Integration tests require local Postgres and Redis:
+
+```bash
+docker compose up -d
+npm run test:int
+```
+
+The integration harness uses `ledger_engine_test` and rebuilds its `public` schema before running migrations.
+
+Manual end-to-end demo flow:
+
+```text
+docs/ACCEPTANCE_FLOW.md
+```

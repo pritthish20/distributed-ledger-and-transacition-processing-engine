@@ -31,6 +31,10 @@ class EnvVars {
     @IsString()
     REDIS_PASSWORD?:string
 
+    @IsOptional()
+    @IsString()
+    QUEUE_PREFIX?:string
+
     @Type(()=>Number)
     @IsInt()
     @Min(100)

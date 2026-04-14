@@ -18,14 +18,14 @@ export class LedgerEntryEntity {
   id!: string;
 
   @Index()
-  @Column({ name: 'transaction_id' })
+  @Column({ name: 'transaction_id', type: 'uuid' })
   transactionId!: string;
 
   @Index()
-  @Column({ name: 'account_id', nullable: true })
+  @Column({ name: 'account_id', type: 'uuid', nullable: true })
   accountId!: string | null;
 
-  @Column({ name: 'ledger_account', nullable: true })
+  @Column({ name: 'ledger_account', type: 'varchar', nullable: true })
   ledgerAccount!: string | null;
 
   @Column({

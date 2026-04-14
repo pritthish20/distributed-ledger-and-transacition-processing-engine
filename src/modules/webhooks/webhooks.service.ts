@@ -83,7 +83,7 @@ export class WebhooksService {
     );
 
     await Promise.all(
-      deliveries.map((delivery) => this.enqueueDelivery(delivery.id, 0)),
+      deliveries.map((delivery) => this.enqueueDelivery(delivery.id, 0, 1)),
     );
   }
 
@@ -146,7 +146,11 @@ export class WebhooksService {
       });
 
       if (shouldRetry && nextRetryAt) {
-        await this.enqueueDelivery(delivery.id, nextRetryAt.getTime() - Date.now());
+        await this.enqueueDelivery(
+          delivery.id,
+          nextRetryAt.getTime() - Date.now(),
+          attempts + 1,
+        );
       }
     }
 
@@ -182,12 +186,12 @@ export class WebhooksService {
     });
   }
 
-  private async enqueueDelivery(deliveryId: string, delayMs: number) {
+  private async enqueueDelivery(deliveryId: string, delayMs: number, attempt: number) {
     await this.webhookQueue.add(
       'deliver-webhook',
       { deliveryId },
       {
-        jobId: deliveryId,
+        jobId: `${deliveryId}-attempt-${attempt}`,
         delay: Math.max(delayMs, 0),
         removeOnComplete: 100,
         removeOnFail: 100,

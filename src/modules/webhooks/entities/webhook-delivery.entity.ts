@@ -13,16 +13,17 @@ import {
 } from 'typeorm';
 
 @Entity({ name: 'webhook_deliveries' })
+@Index(['webhookSubscriptionId', 'outboxEventId'], { unique: true })
 export class WebhookDeliveryEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
   @Index()
-  @Column({ name: 'webhook_subscription_id' })
+  @Column({ name: 'webhook_subscription_id', type: 'uuid' })
   webhookSubscriptionId!: string;
 
   @Index()
-  @Column({ name: 'outbox_event_id' })
+  @Column({ name: 'outbox_event_id', type: 'uuid' })
   outboxEventId!: string;
 
   @Column({
@@ -41,7 +42,7 @@ export class WebhookDeliveryEntity {
   @Column({ name: 'next_retry_at', type: 'timestamptz', nullable: true })
   nextRetryAt!: Date | null;
 
-  @Column({ name: 'response_status', nullable: true })
+  @Column({ name: 'response_status', type: 'int', nullable: true })
   responseStatus!: number | null;
 
   @Column({ name: 'response_body', type: 'text', nullable: true })

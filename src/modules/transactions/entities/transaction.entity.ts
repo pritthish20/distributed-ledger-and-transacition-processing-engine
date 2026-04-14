@@ -46,17 +46,17 @@ export class TransactionEntity {
   currency!: string;
 
   @Index()
-  @Column({ name: 'from_account_id', nullable: true })
+  @Column({ name: 'from_account_id', type: 'uuid', nullable: true })
   fromAccountId!: string | null;
 
   @Index()
-  @Column({ name: 'to_account_id', nullable: true })
+  @Column({ name: 'to_account_id', type: 'uuid', nullable: true })
   toAccountId!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   description!: string | null;
 
-  @Column({ name: 'error_code', nullable: true })
+  @Column({ name: 'error_code', type: 'varchar', nullable: true })
   errorCode!: string | null;
 
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })

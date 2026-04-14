@@ -22,7 +22,7 @@ export class ReconciliationRunEntity {
   @Column({ name: 'total_issues', default: 0 })
   totalIssues!: number;
 
-  @Column({ name: 'error_message', nullable: true })
+  @Column({ name: 'error_message', type: 'varchar', nullable: true })
   errorMessage!: string | null;
 
   @Column({ name: 'started_at', type: 'timestamptz' })

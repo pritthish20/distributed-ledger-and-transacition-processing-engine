@@ -14,7 +14,7 @@ export class ReconciliationIssueEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ name: 'run_id' })
+  @Column({ name: 'run_id', type: 'uuid' })
   runId!: string;
 
   @Column({
@@ -24,7 +24,7 @@ export class ReconciliationIssueEntity {
   })
   issueType!: ReconciliationIssueType;
 
-  @Column({ name: 'reference_id', nullable: true })
+  @Column({ name: 'reference_id', type: 'varchar', nullable: true })
   referenceId!: string | null;
 
   @Column({ type: 'jsonb' })

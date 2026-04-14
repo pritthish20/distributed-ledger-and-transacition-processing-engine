@@ -157,6 +157,7 @@ export class CreateLedgerEngineTables1712500000000 implements MigrationInterface
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         CONSTRAINT "PK_webhook_deliveries_id" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_webhook_deliveries_subscription_outbox" UNIQUE ("webhook_subscription_id", "outbox_event_id"),
         CONSTRAINT "FK_webhook_deliveries_subscription" FOREIGN KEY ("webhook_subscription_id") REFERENCES "webhook_subscriptions"("id") ON DELETE CASCADE ON UPDATE NO ACTION,
         CONSTRAINT "FK_webhook_deliveries_outbox_event" FOREIGN KEY ("outbox_event_id") REFERENCES "outbox_events"("id") ON DELETE CASCADE ON UPDATE NO ACTION
       )
