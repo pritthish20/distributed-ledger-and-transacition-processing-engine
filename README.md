@@ -11,6 +11,18 @@ This project uses Docker Compose to run the infrastructure services locally:
 
 BullMQ itself is a Node library, so there is no separate BullMQ container.
 
+## Database mental model
+
+- `accounts` = current balance snapshot
+- `transactions` = business operation
+- `ledger_entries` = accounting truth
+- `idempotency_records` = duplicate retry protection
+- `outbox_events` = durable event queue in DB
+- `webhook_subscriptions` = who wants event notifications
+- `webhook_deliveries` = delivery attempts
+- `reconciliation_runs` = audit job history
+- `reconciliation_issues` = audit mismatches
+
 ## Environment
 
 Copy local defaults from `.env.example` into `.env` if you want to run against local Docker services:

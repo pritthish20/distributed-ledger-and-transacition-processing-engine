@@ -123,6 +123,18 @@ PostgreSQL will be the source of truth.
 
 Balances will be stored on accounts for fast reads, but every balance update must happen in the same transaction as ledger entry creation.
 
+Quick mental model:
+
+- `accounts` = current balance snapshot
+- `transactions` = business operation
+- `ledger_entries` = accounting truth
+- `idempotency_records` = duplicate retry protection
+- `outbox_events` = durable event queue in DB
+- `webhook_subscriptions` = who wants event notifications
+- `webhook_deliveries` = delivery attempts
+- `reconciliation_runs` = audit job history
+- `reconciliation_issues` = audit mismatches
+
 ### `accounts`
 
 Stores account state and current balance snapshot.
