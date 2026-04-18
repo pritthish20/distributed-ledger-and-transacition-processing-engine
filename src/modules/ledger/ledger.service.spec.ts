@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { UnbalancedLedgerEntriesException } from '../../common/exceptions/domain.exceptions';
 import { LedgerEntryEntity } from './entities/ledger-entry.entity';
 import { LedgerService } from './ledger.service';
 import { LedgerEntryType } from './enums/ledger-entry-type.enum';
@@ -39,7 +40,7 @@ describe('LedgerService', () => {
           },
         ],
       ),
-    ).rejects.toThrow('Ledger entries are not balanced');
+    ).rejects.toBeInstanceOf(UnbalancedLedgerEntriesException);
   });
 
   it('persists balanced ledger entries', async () => {

@@ -1,4 +1,4 @@
-﻿# Acceptance Flow
+# Acceptance Flow
 
 This is the manual end-to-end demo flow for the distributed ledger engine.
 
@@ -196,6 +196,62 @@ Expected result:
 - request contains `x-webhook-signature`
 - payload contains the transaction id, amount, currency, and account ids
 
+## 11. Inspect Operational State
+
+These read-only endpoints are for local debugging and demo visibility. They are internal/demo endpoints in V1 and should not be exposed publicly without auth.
+
+Inspect outbox events:
+
+```powershell
+curl.exe "http://localhost:3000/api/ops/outbox/events?limit=20"
+```
+
+Expected result:
+
+- rows include `eventType`
+- rows include `status`
+- rows include `retryCount`
+- rows include `transactionId`
+
+Inspect webhook deliveries:
+
+```powershell
+curl.exe "http://localhost:3000/api/ops/webhook-deliveries?limit=20"
+```
+
+Expected result after webhook delivery:
+
+- rows include `status`
+- rows include `attemptCount`
+- rows include `responseStatus`
+- rows include `outboxEventId`
+
+Inspect reconciliation runs:
+
+```powershell
+curl.exe "http://localhost:3000/api/ops/reconciliation/runs?limit=20"
+```
+
+If a run exists, inspect its issues by replacing `<RUN_ID>`:
+
+```powershell
+curl.exe "http://localhost:3000/api/ops/reconciliation/runs/<RUN_ID>/issues?limit=20"
+```
+
+## 12. Verify Domain Error Codes
+
+The insufficient funds request from step 9 should include a stable domain error code:
+
+```text
+INSUFFICIENT_FUNDS
+```
+
+The idempotency conflict request from step 8 should include:
+
+```text
+IDEMPOTENCY_PAYLOAD_MISMATCH
+```
+
 ## Acceptance Criteria
 
 - account balances match expected values after deposit and transfer
@@ -205,3 +261,7 @@ Expected result:
 - retrying with the same idempotency key but different payload returns `409`
 - insufficient funds do not create partial money movement
 - webhook events are emitted asynchronously through the outbox path
+- read-only ops endpoints expose outbox, webhook delivery, and reconciliation state
+- domain errors include stable `code` values
+
+

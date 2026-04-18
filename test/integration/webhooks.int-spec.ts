@@ -154,11 +154,14 @@ describe('Webhook worker integration', () => {
       toAccountId: account.id,
     });
 
-    const [outboxEvent] = await dataSource.query(
-      'SELECT status FROM outbox_events WHERE id = $1',
-      [outboxEventId],
-    );
-    expect(outboxEvent.status).toBe('published');
+    await waitForCondition(async () => {
+      const [outboxEvent] = await dataSource.query(
+        'SELECT status FROM outbox_events WHERE id = $1',
+        [outboxEventId],
+      );
+
+      return outboxEvent?.status === 'published';
+    }, 20000);
   });
 
   it('does not create duplicate delivery rows when the same outbox event is dispatched twice', async () => {

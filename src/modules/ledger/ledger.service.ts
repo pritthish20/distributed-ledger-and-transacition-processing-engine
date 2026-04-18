@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
+import { UnbalancedLedgerEntriesException } from '../../common/exceptions/domain.exceptions';
 import { LedgerEntryEntity } from './entities/ledger-entry.entity';
 import { LedgerEntryType } from './enums/ledger-entry-type.enum';
 
@@ -30,7 +31,7 @@ export class LedgerService {
       .reduce((sum, entry) => sum + entry.amount, 0);
 
     if (debits !== credits) {
-      throw new Error('Ledger entries are not balanced');
+      throw new UnbalancedLedgerEntriesException(debits, credits);
     }
 
     return manager.save(

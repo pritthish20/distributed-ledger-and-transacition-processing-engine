@@ -1,10 +1,18 @@
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import {
+  AccountInactiveException,
+  AccountNotFoundException,
+  AccountsNotFoundException,
+  CurrencyMismatchException,
+  InsufficientFundsException,
+  SameAccountTransferException,
+  TransactionNotFoundException,
+} from '../../common/exceptions/domain.exceptions';
 import { AccountEntity } from '../accounts/entities/account.entity';
 import { AccountStatus } from '../accounts/enums/account-status.enum';
 import { LedgerService } from '../ledger/ledger.service';
@@ -19,6 +27,8 @@ import { TransactionType } from './enums/transaction-type.enum';
 
 @Injectable()
 export class TransactionsService {
+  private readonly logger = new Logger(TransactionsService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(AccountEntity)
@@ -37,7 +47,7 @@ export class TransactionsService {
       });
 
       if (!account) {
-        throw new NotFoundException(`Account ${dto.accountId} not found`);
+        throw new AccountNotFoundException(dto.accountId);
       }
 
       this.assertActiveAccount(account);
@@ -82,6 +92,7 @@ export class TransactionsService {
       const savedTransaction = await manager.save(TransactionEntity, transaction);
 
       await this.outboxService.createTransactionCompletedEventInManager(manager, savedTransaction);
+      this.logTransactionCompleted(savedTransaction);
 
       return this.toTransactionResponse(savedTransaction);
     });
@@ -95,7 +106,7 @@ export class TransactionsService {
       });
 
       if (!account) {
-        throw new NotFoundException(`Account ${dto.accountId} not found`);
+        throw new AccountNotFoundException(dto.accountId);
       }
 
       this.assertActiveAccount(account);
@@ -141,6 +152,7 @@ export class TransactionsService {
       const savedTransaction = await manager.save(TransactionEntity, transaction);
 
       await this.outboxService.createTransactionCompletedEventInManager(manager, savedTransaction);
+      this.logTransactionCompleted(savedTransaction);
 
       return this.toTransactionResponse(savedTransaction);
     });
@@ -148,7 +160,7 @@ export class TransactionsService {
 
   async transfer(dto: TransferDto) {
     if (dto.fromAccountId === dto.toAccountId) {
-      throw new BadRequestException('Source and destination accounts must be different');
+      throw new SameAccountTransferException(dto.fromAccountId);
     }
 
     return this.dataSource.transaction(async (manager) => {
@@ -164,14 +176,14 @@ export class TransactionsService {
       });
 
       if (accounts.length !== 2) {
-        throw new NotFoundException('Both accounts must exist');
+        throw new AccountsNotFoundException([dto.fromAccountId, dto.toAccountId]);
       }
 
       const fromAccount = accounts.find((account) => account.id === dto.fromAccountId);
       const toAccount = accounts.find((account) => account.id === dto.toAccountId);
 
       if (!fromAccount || !toAccount) {
-        throw new NotFoundException('Both accounts must exist');
+        throw new AccountsNotFoundException([dto.fromAccountId, dto.toAccountId]);
       }
 
       this.assertActiveAccount(fromAccount);
@@ -219,6 +231,7 @@ export class TransactionsService {
       const savedTransaction = await manager.save(TransactionEntity, transaction);
 
       await this.outboxService.createTransactionCompletedEventInManager(manager, savedTransaction);
+      this.logTransactionCompleted(savedTransaction);
 
       return this.toTransactionResponse(savedTransaction);
     });
@@ -230,7 +243,7 @@ export class TransactionsService {
     });
 
     if (!transaction) {
-      throw new NotFoundException(`Transaction ${transactionId} not found`);
+      throw new TransactionNotFoundException(transactionId);
     }
 
     return this.toTransactionResponse(transaction);
@@ -238,20 +251,32 @@ export class TransactionsService {
 
   private assertActiveAccount(account: AccountEntity) {
     if (account.status !== AccountStatus.ACTIVE) {
-      throw new BadRequestException(`Account ${account.id} is not active`);
+      throw new AccountInactiveException(account.id);
     }
   }
 
   private assertCurrency(accountCurrency: string, requestCurrency: string) {
     if (accountCurrency !== requestCurrency) {
-      throw new BadRequestException('Currency mismatch');
+      throw new CurrencyMismatchException(accountCurrency, requestCurrency);
     }
   }
 
   private assertSufficientFunds(balance: number, amount: number) {
     if (balance < amount) {
-      throw new BadRequestException('Insufficient balance');
+      throw new InsufficientFundsException(balance, amount);
     }
+  }
+
+  private logTransactionCompleted(transaction: TransactionEntity) {
+    this.logger.log({
+      message: 'Transaction completed',
+      transactionId: transaction.id,
+      type: transaction.type,
+      amount: transaction.amount,
+      currency: transaction.currency,
+      fromAccountId: transaction.fromAccountId,
+      toAccountId: transaction.toAccountId,
+    });
   }
 
   private toTransactionResponse(transaction: TransactionEntity) {

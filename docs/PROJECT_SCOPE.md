@@ -125,6 +125,19 @@ Runs background consistency checks between balances and ledger-derived totals an
 
 Provides readiness and liveness endpoints.
 
+### `ops`
+
+Provides read-only operational visibility for local debugging and demos.
+
+V1 ops endpoints are internal/demo-only and intentionally unauthenticated because auth is out of scope.
+
+Included read APIs:
+
+- list outbox events
+- list webhook deliveries
+- list reconciliation runs
+- list reconciliation issues for a run
+
 ## Database Scope
 
 PostgreSQL will be the source of truth.
@@ -381,4 +394,5 @@ The success criterion is a working transaction engine that can clearly demonstra
 - duplicate request protection
 - reliable post-commit event handling
 - audit and reconciliation readiness
+
 

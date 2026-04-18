@@ -63,6 +63,31 @@ WEBHOOK_MAX_ATTEMPTS=5
 WEBHOOK_BACKOFF_MS=5000
 ```
 
+## Phase 3 operational visibility
+
+Read-only ops APIs are available for local debugging and demos. They are intentionally internal/demo endpoints in V1; authentication is out of scope for this version, so do not expose them publicly.
+
+```text
+GET /api/ops/outbox/events?status=failed&limit=20&offset=0
+GET /api/ops/webhook-deliveries?status=failed&limit=20&offset=0
+GET /api/ops/reconciliation/runs?status=completed&limit=20&offset=0
+GET /api/ops/reconciliation/runs/:runId/issues?issueType=account_balance_mismatch
+```
+
+The service also uses domain error codes for predictable failures, for example:
+
+```text
+ACCOUNT_NOT_FOUND
+TRANSACTION_NOT_FOUND
+ACCOUNT_INACTIVE
+CURRENCY_MISMATCH
+INSUFFICIENT_FUNDS
+IDEMPOTENCY_PAYLOAD_MISMATCH
+LEDGER_ENTRIES_UNBALANCED
+```
+
+Structured logs are emitted around transaction completion, outbox dispatch failures, webhook delivery success/failure, and reconciliation runs. Logs include correlation fields such as `transactionId`, `outboxEventId`, `deliveryId`, and `runId`; webhook secrets and full payloads are not logged.
+
 ## Start local infrastructure
 
 ```bash

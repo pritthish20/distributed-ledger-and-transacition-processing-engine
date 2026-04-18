@@ -1,6 +1,6 @@
-import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { AccountNotFoundException } from '../../common/exceptions/domain.exceptions';
 import { LedgerEntryType } from '../ledger/enums/ledger-entry-type.enum';
 import { LedgerService } from '../ledger/ledger.service';
 import { TransactionStatus } from '../transactions/enums/transaction-status.enum';
@@ -93,7 +93,7 @@ describe('AccountsService', () => {
   it('throws when account balance is requested for a missing account', async () => {
     accountsRepository.findOne.mockResolvedValue(null);
 
-    await expect(service.getBalance('missing-account')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getBalance('missing-account')).rejects.toBeInstanceOf(AccountNotFoundException);
   });
 
   it('returns a ledger-backed account statement', async () => {

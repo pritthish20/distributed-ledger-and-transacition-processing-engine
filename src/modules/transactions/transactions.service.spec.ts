@@ -1,7 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import {
+  InsufficientFundsException,
+  SameAccountTransferException,
+} from '../../common/exceptions/domain.exceptions';
 import { AccountEntity } from '../accounts/entities/account.entity';
 import { AccountStatus } from '../accounts/enums/account-status.enum';
 import { LedgerEntryType } from '../ledger/enums/ledger-entry-type.enum';
@@ -67,7 +70,7 @@ describe('TransactionsService', () => {
         amount: 100,
         currency: 'INR',
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(SameAccountTransferException);
   });
 
   it('deposits funds with a balanced ledger and outbox event', async () => {
@@ -137,7 +140,7 @@ describe('TransactionsService', () => {
         amount: 500,
         currency: 'INR',
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(InsufficientFundsException);
 
     expect(account.balance).toBe(100);
     expect(ledgerService.createEntries).not.toHaveBeenCalled();

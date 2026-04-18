@@ -12,9 +12,10 @@ import { OutboxModule } from './modules/outbox/outbox.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { HealthModule } from './modules/health/health.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
+import { OpsModule } from './modules/ops/ops.module';
 
 @Module({
-  imports: [ConfigModule, DatabaseModule, JobsModule, AccountsModule, TransactionsModule, LedgerModule, IdempotencyModule, OutboxModule, WebhooksModule, HealthModule, ReconciliationModule],
+  imports: [ConfigModule, DatabaseModule, JobsModule, AccountsModule, TransactionsModule, LedgerModule, IdempotencyModule, OutboxModule, WebhooksModule, HealthModule, ReconciliationModule, OpsModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -1,5 +1,4 @@
 import {
-  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -7,6 +6,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
+import {
+  IdempotencyKeyProcessingException,
+  IdempotencyKeyRequiredException,
+  IdempotencyPayloadMismatchException,
+} from '../../common/exceptions/domain.exceptions';
 import { createPayloadHash } from '../../common/utils/hash.util';
 import { IdempotencyRecordEntity } from './entities/idempotency-record.entity';
 import { IdempotencyStatus } from './enums/idempotency-status.enum';
@@ -29,7 +33,7 @@ export class IdempotencyService {
     }>,
   ): Promise<T> {
     if (!idempotencyKey) {
-      throw new ConflictException('Idempotency-Key header is required');
+      throw new IdempotencyKeyRequiredException();
     }
 
     const requestHash = createPayloadHash(payload);
@@ -48,7 +52,7 @@ export class IdempotencyService {
       }
 
       if (existingRecord.status === IdempotencyStatus.PROCESSING) {
-        throw new ConflictException('A request with this idempotency key is already being processed');
+        throw new IdempotencyKeyProcessingException();
       }
 
       await this.idempotencyRepository.update(existingRecord.id, {
@@ -121,7 +125,7 @@ export class IdempotencyService {
 
   private assertRequestHash(existingHash: string, requestHash: string) {
     if (existingHash !== requestHash) {
-      throw new ConflictException('Idempotency key has already been used with a different payload');
+      throw new IdempotencyPayloadMismatchException();
     }
   }
 

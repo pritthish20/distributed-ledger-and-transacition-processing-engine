@@ -24,6 +24,9 @@ export class ReconciliationService {
 
   async runReconciliation() {
     if (this.running) {
+      this.logger.log({
+        message: 'Reconciliation run skipped because a run is already active',
+      });
       return {
         skipped: true,
         reason: 'already_running',
@@ -74,6 +77,13 @@ export class ReconciliationService {
         totalIssues: issues.length,
         completedAt: new Date(),
       });
+      this.logger.log({
+        message: 'Reconciliation run completed',
+        runId: run.id,
+        totalIssues: issues.length,
+        accountMismatchCount: accountMismatches.length,
+        unbalancedTransactionCount: unbalancedTransactions.length,
+      });
 
       return {
         skipped: false,
@@ -82,7 +92,12 @@ export class ReconciliationService {
         totalIssues: issues.length,
       };
     } catch (error) {
-      this.logger.error('Reconciliation run failed', error instanceof Error ? error.stack : undefined);
+      this.logger.error({
+        message: 'Reconciliation run failed',
+        runId: run.id,
+        error: error instanceof Error ? error.message : 'Reconciliation failed',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       await this.runsRepository.update(run.id, {
         status: ReconciliationRunStatus.FAILED,
         errorMessage: error instanceof Error ? error.message : 'Reconciliation failed',

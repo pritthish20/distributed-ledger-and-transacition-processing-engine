@@ -1,6 +1,6 @@
-import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { IdempotencyPayloadMismatchException } from '../../common/exceptions/domain.exceptions';
 import { createPayloadHash } from '../../common/utils/hash.util';
 import { IdempotencyRecordEntity } from './entities/idempotency-record.entity';
 import { IdempotencyStatus } from './enums/idempotency-status.enum';
@@ -63,7 +63,7 @@ describe('IdempotencyService', () => {
         { amount: 200 },
         jest.fn(),
       ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toBeInstanceOf(IdempotencyPayloadMismatchException);
   });
 
   it('creates a processing record and stores the successful response for a new request', async () => {

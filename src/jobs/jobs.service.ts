@@ -62,10 +62,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         }
       }
     } catch (error) {
-      this.logger.error(
-        'Outbox processing failed',
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.logger.error({
+        message: 'Outbox batch processing failed',
+        error: error instanceof Error ? error.message : 'Unknown outbox batch error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     } finally {
       this.outboxRunning = false;
     }
@@ -81,9 +82,14 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         : null;
 
     await this.outboxService.markFailed(eventId, nextRetryCount, nextRetryAt);
-    this.logger.error(
-      `Outbox event ${eventId} dispatch failed`,
-      error instanceof Error ? error.stack : undefined,
-    );
+    this.logger.error({
+      message: 'Outbox event dispatch failed',
+      outboxEventId: eventId,
+      retryCount: nextRetryCount,
+      nextRetryAt,
+      terminal: nextRetryAt === null,
+      error: error instanceof Error ? error.message : 'Unknown outbox dispatch error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
   }
 }

@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AccountNotFoundException } from '../../common/exceptions/domain.exceptions';
 import { LedgerService } from '../ledger/ledger.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { GetStatementDto } from './dto/get-statement.dto';
@@ -9,6 +10,8 @@ import { AccountStatus } from './enums/account-status.enum';
 
 @Injectable()
 export class AccountsService {
+  private readonly logger = new Logger(AccountsService.name);
+
   constructor(
     @InjectRepository(AccountEntity)
     private readonly accountsRepository: Repository<AccountEntity>,
@@ -23,6 +26,12 @@ export class AccountsService {
     });
 
     const savedAccount = await this.accountsRepository.save(account);
+    this.logger.log({
+      message: 'Account created',
+      accountId: savedAccount.id,
+      currency: savedAccount.currency,
+      status: savedAccount.status,
+    });
 
     return {
       id: savedAccount.id,
@@ -39,8 +48,15 @@ export class AccountsService {
     });
 
     if (!account) {
-      throw new NotFoundException(`Account ${accountId} not found`);
+      throw new AccountNotFoundException(accountId);
     }
+
+    this.logger.log({
+      message: 'Account balance fetched',
+      accountId: account.id,
+      currency: account.currency,
+      status: account.status,
+    });
 
     return {
       accountId: account.id,
@@ -57,10 +73,17 @@ export class AccountsService {
     });
 
     if (!account) {
-      throw new NotFoundException(`Account ${accountId} not found`);
+      throw new AccountNotFoundException(accountId);
     }
 
     const entries = await this.ledgerService.getAccountStatement(accountId, query.limit ?? 20);
+    this.logger.log({
+      message: 'Account statement fetched',
+      accountId: account.id,
+      currency: account.currency,
+      entryCount: entries.length,
+      limit: query.limit ?? 20,
+    });
 
     return {
       accountId: account.id,

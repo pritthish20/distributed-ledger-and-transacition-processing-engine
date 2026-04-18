@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -17,6 +17,8 @@ import { WebhookSubscriptionStatus } from './enums/webhook-subscription-status.e
 
 @Injectable()
 export class WebhooksService {
+  private readonly logger = new Logger(WebhooksService.name);
+
   constructor(
     @InjectRepository(WebhookSubscriptionEntity)
     private readonly subscriptionsRepository: Repository<WebhookSubscriptionEntity>,
@@ -39,6 +41,13 @@ export class WebhooksService {
     });
 
     const savedSubscription = await this.subscriptionsRepository.save(subscription);
+    this.logger.log({
+      message: 'Webhook subscription registered',
+      webhookSubscriptionId: savedSubscription.id,
+      eventType: savedSubscription.eventType,
+      status: savedSubscription.status,
+      targetUrl: savedSubscription.targetUrl,
+    });
 
     return {
       id: savedSubscription.id,
@@ -70,6 +79,11 @@ export class WebhooksService {
 
     if (subscriptions.length === 0 && existingDeliveries.length === 0) {
       await this.outboxService.markPublished(event.id);
+      this.logger.log({
+        message: 'Outbox event published without webhook subscribers',
+        outboxEventId: event.id,
+        eventType: event.eventType,
+      });
       return;
     }
 
@@ -107,6 +121,13 @@ export class WebhooksService {
         this.enqueueDelivery(delivery.id, 0, delivery.attemptCount + 1),
       ),
     );
+    this.logger.log({
+      message: 'Webhook deliveries enqueued',
+      outboxEventId: event.id,
+      eventType: event.eventType,
+      pendingDeliveries: pendingDeliveries.length,
+      newDeliveries: newDeliveries.length,
+    });
   }
 
   async processDelivery(deliveryId: string) {
@@ -126,6 +147,12 @@ export class WebhooksService {
       delivery.status === WebhookDeliveryStatus.SUCCESS ||
       delivery.status === WebhookDeliveryStatus.FAILED
     ) {
+      this.logger.log({
+        message: 'Skipping terminal webhook delivery job',
+        deliveryId: delivery.id,
+        outboxEventId: delivery.outboxEventId,
+        status: delivery.status,
+      });
       return;
     }
 
@@ -157,6 +184,14 @@ export class WebhooksService {
         responseStatus: response.status,
         responseBody,
       });
+      this.logger.log({
+        message: 'Webhook delivery succeeded',
+        deliveryId: delivery.id,
+        outboxEventId: delivery.outboxEventId,
+        webhookSubscriptionId: delivery.webhookSubscriptionId,
+        attemptCount: attempts,
+        responseStatus: response.status,
+      });
     } catch (error) {
       const maxAttempts = this.configService.get<number>('queue.webhookMaxAttempts') ?? 5;
       const backoffMs = this.configService.get<number>('queue.webhookBackoffMs') ?? 5000;
@@ -172,6 +207,16 @@ export class WebhooksService {
         nextRetryAt,
         responseStatus: null,
         responseBody: error instanceof Error ? error.message : 'Webhook delivery failed',
+      });
+      this.logger.warn({
+        message: 'Webhook delivery failed',
+        deliveryId: delivery.id,
+        outboxEventId: delivery.outboxEventId,
+        webhookSubscriptionId: delivery.webhookSubscriptionId,
+        attemptCount: attempts,
+        willRetry: shouldRetry,
+        nextRetryAt,
+        error: error instanceof Error ? error.message : 'Webhook delivery failed',
       });
 
       if (shouldRetry && nextRetryAt) {
