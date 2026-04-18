@@ -1,166 +1,134 @@
 # Distributed Ledger and Transaction Processing Engine
 
-NestJS backend for a transaction engine with PostgreSQL as the source of truth and Redis as the queue backbone for BullMQ jobs.
+A modular-monolith NestJS backend that models the core of a financial transaction engine: concurrency-safe money movement, double-entry ledger accounting, idempotent write APIs, durable post-commit event processing, and audit-oriented reconciliation.
 
-## Local infrastructure
+## Why This Project
 
-This project uses Docker Compose to run the infrastructure services locally:
+This project is meant to demonstrate backend engineering beyond CRUD:
 
-- PostgreSQL for transactional ledger storage
-- Redis for BullMQ queues and Redis-backed workflows
+- ACID-safe transaction handling with PostgreSQL
+- row-level locking to prevent double spending and overdraw
+- double-entry ledger design for accounting correctness
+- idempotency protection for retry-safe write APIs
+- transactional outbox for reliable post-commit events
+- BullMQ and Redis for async webhook delivery and retries
+- reconciliation jobs for auditability and anomaly detection
+- structured logs and operational read APIs for inspection
 
-BullMQ itself is a Node library, so there is no separate BullMQ container.
-
-## Database mental model
-
-- `accounts` = current balance snapshot
-- `transactions` = business operation
-- `ledger_entries` = accounting truth
-- `idempotency_records` = duplicate retry protection
-- `outbox_events` = durable event queue in DB
-- `webhook_subscriptions` = who wants event notifications
-- `webhook_deliveries` = delivery attempts
-- `reconciliation_runs` = audit job history
-- `reconciliation_issues` = audit mismatches
-
-## Environment
-
-Copy local defaults from `.env.example` into `.env` if you want to run against local Docker services:
-
-```bash
-cp .env.example .env
-```
-
-Local defaults:
-
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ledger_engine
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-QUEUE_PREFIX=ledger-engine
-```
-
-Your current `.env` can still point to a hosted Postgres instance if you want. Only switch it to the local connection string when you want Docker-backed local infra.
-
-## Phase 2 reliability flow
-
-Successful money movement writes business data, ledger entries, and an `outbox_events` row in the same PostgreSQL transaction. A background job poller reads processable outbox rows, marks them `processing`, and dispatches matching webhook deliveries through BullMQ.
-
-Webhook delivery jobs persist attempt state in `webhook_deliveries`, sign outgoing payloads, retry with exponential backoff, and eventually mark the outbox event `published` or `failed`. Stale `processing` outbox rows are recovered by the poller so a crash after `processing` does not permanently strand an event.
-
-Reconciliation also runs in the background. It compares account balance snapshots against ledger-derived balances and records anomalies in `reconciliation_runs` and `reconciliation_issues`.
-
-Useful worker knobs:
-
-```env
-OUTBOX_POLL_INTERVAL_MS=5000
-OUTBOX_BATCH_SIZE=20
-OUTBOX_BACKOFF_MS=5000
-OUTBOX_MAX_ATTEMPTS=5
-OUTBOX_STALE_AFTER_MS=30000
-RECONCILIATION_INTERVAL_MS=60000
-WEBHOOK_MAX_ATTEMPTS=5
-WEBHOOK_BACKOFF_MS=5000
-```
-
-## Phase 3 operational visibility
-
-Read-only ops APIs are available for local debugging and demos. They are intentionally internal/demo endpoints in V1; authentication is out of scope for this version, so do not expose them publicly.
+## Architecture
 
 ```text
-GET /api/ops/outbox/events?status=failed&limit=20&offset=0
-GET /api/ops/webhook-deliveries?status=failed&limit=20&offset=0
-GET /api/ops/reconciliation/runs?status=completed&limit=20&offset=0
-GET /api/ops/reconciliation/runs/:runId/issues?issueType=account_balance_mismatch
+Client
+  -> NestJS API
+  -> Transactions / Accounts / Ledger / Idempotency modules
+  -> PostgreSQL (source of truth)
+  -> Outbox events persisted in the same DB transaction
+  -> BullMQ jobs backed by Redis
+  -> Webhook delivery + reconciliation workers
 ```
 
-The service also uses domain error codes for predictable failures, for example:
+## Core Domain Model
 
-```text
-ACCOUNT_NOT_FOUND
-TRANSACTION_NOT_FOUND
-ACCOUNT_INACTIVE
-CURRENCY_MISMATCH
-INSUFFICIENT_FUNDS
-IDEMPOTENCY_PAYLOAD_MISMATCH
-LEDGER_ENTRIES_UNBALANCED
-```
+- `accounts`: current balance snapshot for fast reads
+- `transactions`: business-level money movement record
+- `ledger_entries`: accounting truth through balanced debit/credit entries
+- `idempotency_records`: duplicate retry protection for write APIs
+- `outbox_events`: durable post-commit event queue stored in PostgreSQL
+- `webhook_subscriptions`: downstream endpoints that want transaction notifications
+- `webhook_deliveries`: delivery attempts, retries, and terminal status
+- `reconciliation_runs`: audit job history
+- `reconciliation_issues`: mismatches found during reconciliation
 
-Structured logs are emitted around transaction completion, outbox dispatch failures, webhook delivery success/failure, and reconciliation runs. Logs include correlation fields such as `transactionId`, `outboxEventId`, `deliveryId`, and `runId`; webhook secrets and full payloads are not logged.
+## V1 Capabilities
 
-## Start local infrastructure
+### Financial core
 
-```bash
+- create accounts
+- fetch balances and statements
+- deposit, withdraw, and transfer funds
+- reject insufficient funds and invalid currency flows
+- keep all balance mutations and ledger writes atomic
+
+### Reliability layer
+
+- require `Idempotency-Key` on write APIs
+- replay the original logical result for safe retries
+- write outbox events in the same DB transaction as committed money movement
+- deliver transaction-completed webhooks asynchronously
+- retry webhook delivery with backoff and terminal failure handling
+- recover stale outbox rows after interrupted processing
+
+### Operational visibility
+
+- `GET /api/health`
+- `GET /api/ops/outbox/events`
+- `GET /api/ops/webhook-deliveries`
+- `GET /api/ops/reconciliation/runs`
+- `GET /api/ops/reconciliation/runs/:runId/issues`
+
+## Tech Stack
+
+- NestJS + TypeScript
+- PostgreSQL + TypeORM
+- Redis + BullMQ
+- Docker Compose for local infrastructure
+- Jest for unit and integration testing
+- Swagger for API exploration
+
+## Correctness Rules
+
+- amounts are stored in minor units only
+- no negative balances
+- no balance mutation without matching ledger entries
+- transfers lock both accounts before mutation
+- retries must not duplicate money movement
+- outbox rows are committed with business data, not after it
+
+## Local Run
+
+1. Copy environment defaults.
+2. Start Postgres and Redis.
+3. Run migrations.
+4. Start the API.
+
+```powershell
+Copy-Item .env.example .env
+
 docker compose up -d
+cmd /c npm run migration:run
+cmd /c npm run start:dev
 ```
 
-To stop it:
+Local endpoints:
 
-```bash
-docker compose down
-```
-
-To stop it and remove persisted volumes:
-
-```bash
-docker compose down -v
-```
-
-## Run the Nest app
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Start in watch mode:
-
-```bash
-npm run start:dev
-```
-
-Start in debug mode:
-
-```bash
-npm run start:debug
-```
-
-## Services
-
-- PostgreSQL: `localhost:5432`
-- Redis: `localhost:6379`
-- API: `http://localhost:3000`
+- API: `http://localhost:3000/api`
 - Swagger: `http://localhost:3000/docs`
-
-## Verification
-
-Useful checks after `docker compose up -d`:
-
-```bash
-docker compose ps
-docker compose logs postgres
-docker compose logs redis
-```
+- Postgres: `localhost:5432`
+- Redis: `localhost:6379`
 
 ## Tests
 
-```bash
-npm run test
-npm run test:e2e
+```powershell
+cmd /c npm test -- --runInBand
+cmd /c npm run test:int
+cmd /c npm run build
 ```
 
-Integration tests require local Postgres and Redis:
+Integration tests expect local Docker-backed Postgres and Redis.
 
-```bash
-docker compose up -d
-npm run test:int
-```
+## Demo Flow
 
-The integration harness uses `ledger_engine_test` and rebuilds its `public` schema before running migrations.
+For a complete Postman or curl verification flow, use [docs/ACCEPTANCE_FLOW.md](docs/ACCEPTANCE_FLOW.md).
 
-Manual end-to-end demo flow:
+## Documentation Map
 
-```text
-docs/ACCEPTANCE_FLOW.md
-```
+Use the root README as the public project overview. Keep the rest as supporting design notes and implementation history.
+
+- [docs/PHASES.md](docs/PHASES.md): milestone-by-milestone build history and what each phase added
+- [docs/PROJECT_SCOPE.md](docs/PROJECT_SCOPE.md): deeper scope, module boundaries, and data model notes
+- [docs/ACCEPTANCE_FLOW.md](docs/ACCEPTANCE_FLOW.md): manual end-to-end verification steps
+- [docs/FOLDER_STRUCTURE.md](docs/FOLDER_STRUCTURE.md): original structural planning notes
+
+## Resume-Friendly Summary
+
+Architected a distributed-ledger-style transaction engine in NestJS using PostgreSQL, Redis, and BullMQ, implementing ACID-safe money movement, concurrency-safe balance updates, double-entry ledger accounting, idempotent APIs, transactional outbox processing, webhook retries, and reconciliation workflows.

@@ -1,4 +1,33 @@
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ledger-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ledger_engine
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_PREFIX: ledger-engine
+      WEBHOOK_MAX_ATTEMPTS: 5
+      WEBHOOK_BACKOFF_MS: 5000
+      OUTBOX_POLL_INTERVAL_MS: 5000
+      OUTBOX_BATCH_SIZE: 20
+      OUTBOX_BACKOFF_MS: 5000
+      OUTBOX_MAX_ATTEMPTS: 5
+      OUTBOX_STALE_AFTER_MS: 30000
+      RECONCILIATION_INTERVAL_MS: 60000
+    ports:
+      - '3000:3000'
+
   postgres:
     image: postgres:16-alpine
     container_name: ledger-postgres
